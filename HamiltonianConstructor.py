@@ -25,4 +25,8 @@ class HamiltonianConstructor(metaclass=ABCMeta):
     def get_plottable_solution(self, solution_sampleset, energy_rank=0):
         pass
 
+    @abstractmethod
+    def plottable_solution_to_pruned(self, plottable_solution):
+        pass
+
 from HamiltonianConstructors.JobShopHamiltonianConstructor import JobShopHamiltonianConstructor

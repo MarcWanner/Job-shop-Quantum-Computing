@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from data import JobShopSchedulingData
-from Reader import Reader
+import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import random
@@ -9,7 +9,7 @@ class JobShopScheduler(metaclass=ABCMeta):
     def __init__(self, data: JobShopSchedulingData):
         self._data = data
         self._plottable_solution = None
-        self._benchmarking_data = {}
+        self._benchmarking_data = {"PLOTTABLE_SOLUTION": "NONE"}
 
     @abstractmethod
     def solve(self):
@@ -32,6 +32,7 @@ class JobShopScheduler(metaclass=ABCMeta):
         ax.set_title(self.get_solver_name())
         plt.xlim([0, T])
         plt.ylim([0, m])
+        plt.yticks(np.arange(m)+np.ones(m)*0.25, ["Machine " + str(i) for i in range(m)])
         colorlist = []
         random.seed(1)
         for k in range(J):
@@ -57,6 +58,8 @@ class JobShopScheduler(metaclass=ABCMeta):
         ax.legend(handles=legend_elements)
 
     def store_soution(self):
-        pass
+        if self._plottable_solution is None:
+            self.get_plottable_solution()
+        self._benchmarking_data["PLOTTABLE_SOLUTION"] = self._plottable_solution
 
 from CPLEXScheduler import CPLEXSolver

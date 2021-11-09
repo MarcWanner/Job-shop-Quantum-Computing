@@ -13,16 +13,20 @@ def main():
     reader.read_problem_data("Problems/micro_example.txt")
     data = reader.get_data()
 
-    solvers = []
-    #solvers = [CPLEXSolver(data)]
+    #solvers = []
+    solvers = [CPLEXSolver(data)]
     #solvers.append(SASolver(data, JobShopHamiltonianConstructor(), 5, variable_pruning=True))
     #solvers.append(QASolver(data, JobShopHamiltonianConstructor(), 8, variable_pruning=True))
     solvers.append(QAOASolver(data, JobShopHamiltonianConstructor(), 5, 1, variable_pruning=True, objective_bias=0,
-               theta=[1, 1]))
-    for solver in solvers:
-        #solver.solve(num_reads=1000)
-        #solver.plot_solution()
-        solver.plot_expectation_heatmap((50, 50), 512)
+                              order_bias=1, machine_bias=1, single_run_bias=1, theta=[1, 1]))
+    #solvers[0].solve()
+    #plottable_solution = solvers[0].get_plottable_solution()
+    #solvers[0].plot_solution()
+    for solver in solvers[1:]:
+        solver.solve(num_reads=1000)
+        solver.plot_solution()
+        #solver.plot_success_probability_heatmap((100, 100), plottable_solution, 10000)
+
     plt.show()
 
 
