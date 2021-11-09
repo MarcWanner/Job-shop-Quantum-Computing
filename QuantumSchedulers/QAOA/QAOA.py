@@ -75,6 +75,7 @@ class ThetaOptimizer(metaclass=ABCMeta):
         self._qc_sampler = None
         self._num_reads = None
         self._hamiltonian = None
+        self._expected_energy = None
 
     def get_theta(self, hamiltonian, theta_init, num_reads: int, circuit_builder=None, qc_sampler=None):
         if self._theta is None:
@@ -91,6 +92,9 @@ class ThetaOptimizer(metaclass=ABCMeta):
             self.optimize_theta(cb, qs, num_reads, hamiltonian, theta_init)
 
         return self._theta
+
+    def get_expected_energy(self):
+        return self._expected_energy
 
     @abstractmethod
     def optimize_theta(self, circuit_builder: CircuitBuilder, qc_sampler: QCSampler, num_reads: int, hamiltonian,

@@ -9,7 +9,6 @@ class QuboCircuitBuilder(CircuitBuilder):
         super().__init__()
 
     def build_quantum_circuit(self, theta, bqm, num_qubits: int):
-        print(theta)
         self._theta = theta
         self._bqm = bqm
         self._num_qubits = num_qubits

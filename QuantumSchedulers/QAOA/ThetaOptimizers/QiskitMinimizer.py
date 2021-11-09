@@ -9,7 +9,7 @@ class QiskitMinimizer(ThetaOptimizer):
         self._method = method
 
     def optimize_theta(self, circuit_builder: CircuitBuilder, qc_sampler: QCSampler, num_reads: int, hamiltonian,
-                       theta):
+                       theta, verbose=False):
         self._circuit_builder = circuit_builder
         self._qc_sampler = qc_sampler
         self._num_reads = num_reads
@@ -18,7 +18,9 @@ class QiskitMinimizer(ThetaOptimizer):
         expectation = get_expectation(self._hamiltonian, self._circuit_builder, self._qc_sampler, self._num_reads)
         res = minimize(expectation, theta, method=self._method)
         self._theta = res.x
-        print(res.values())
+        self._expected_energy = res.fun
+        if verbose:
+            print(res)
 
 
 def key_to_vector(key: str):

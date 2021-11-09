@@ -56,7 +56,6 @@ class JobShopHamiltonianConstructor(HamiltonianConstructor):
                     plottable_solution[idx[0], idx[1], idx[2] + k] = 1
         return plottable_solution
 
-
     def two_d_idx(self, idx):
         return (int(idx / self._m), idx % self._m)
 
@@ -65,7 +64,6 @@ class JobShopHamiltonianConstructor(HamiltonianConstructor):
         index1, index2 = indices[1:-1].split('][')
         two_d_indices = self.two_d_idx(int(index1))
         return int(two_d_indices[0]), int(two_d_indices[1]), int(index2)
-
 
     def order_constraint(self):
         H = 0
@@ -140,7 +138,6 @@ class JobShopHamiltonianConstructor(HamiltonianConstructor):
         return t / self._T
 
     def simple_variable_pruning(self):
-        impugned_labels = []
         for i in range(self._J):
             temp_sum = 0
             job_sum = np.sum([self._P[i, o] for o in range(self._m)])
@@ -154,6 +151,12 @@ class JobShopHamiltonianConstructor(HamiltonianConstructor):
                     self._bqm.fix_variable(get_label(idx, t), 0)
                     self._labels.remove(get_label(idx, t))
                 temp_sum += self._P[i, o]
+
+    def plottable_solution_to_pruned(self, plottable_solution):
+        pruned = np.zeros(len(self._labels))
+        for i in range(len(self._labels)):
+            pruned[i] = plottable_solution[self.label_to_3d_idx(self._labels[i])]
+        return pruned
 
 
 def get_label(op_idx, t):
