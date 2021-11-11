@@ -5,6 +5,7 @@ class HamiltonianConstructor(metaclass=ABCMeta):
     def __init__(self):
         self._data = None
         self._hamiltonian = None
+        self._T = None
 
     def get_hamiltonian(self, scheduling_data: JobShopSchedulingData, time_span: int, order_bias: float = 1,
                               machine_bias: float = 1, single_run_bias: float = 1, objective_bias: float = 1,
@@ -28,5 +29,12 @@ class HamiltonianConstructor(metaclass=ABCMeta):
     @abstractmethod
     def plottable_solution_to_pruned(self, plottable_solution):
         pass
+
+    @abstractmethod
+    def get_name(self):
+        pass
+
+    def get_T(self):
+        return self._T
 
 from HamiltonianConstructors.JobShopHamiltonianConstructor import JobShopHamiltonianConstructor

@@ -30,5 +30,5 @@ class QCJobShopScheduler(JobShopScheduler, metaclass=ABCMeta):
         assert self._sampleset is not None
         self._plottable_solution = self._hamiltonian_constructor.get_plottable_solution(self._sampleset, energy_rank)
 
-from QuantumSchedulers.QUBOSolvers.QUBOScheduler import SASolver, QASolver
+from QuantumSchedulers.QUBOSolvers.QUBOScheduler import SASolver, QASolver, SimpleQUBOSolver, QiskitQAOASolver
 from QuantumSchedulers.QAOA.QAOASolver import QAOASolver

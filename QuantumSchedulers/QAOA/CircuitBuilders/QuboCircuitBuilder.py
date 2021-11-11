@@ -27,8 +27,10 @@ class QuboCircuitBuilder(CircuitBuilder):
             self._quantum_circuit.append(u_problem(gammas[i], num_qubits, bqm), range(num_qubits))
             self._quantum_circuit.append(u_mixer(betas[i], num_qubits), range(num_qubits))
 
-
         self._quantum_circuit.measure_all()
+
+    def get_name(self):
+        return "QUBOCIRCUITBUILDER"
 
 
 def qc_init(num_qubits: int):
@@ -43,6 +45,7 @@ def u_mixer(beta: float, num_qubits: int):
     for i in range(num_qubits):
         qc.rx(2*beta, i)
     return qc
+
 
 def u_problem_dense(gamma: float, num_qubits: int, hamiltonian):
     qaoa_circuit = QuantumCircuit(num_qubits)
@@ -63,6 +66,8 @@ def u_problem_dense(gamma: float, num_qubits: int, hamiltonian):
 
     return qaoa_circuit
 
+
+# iterate over the bqm, i.e. the not 0 indices
 def u_problem_sparse(gamma: float, num_qubits: int, bqm):
     pass
 

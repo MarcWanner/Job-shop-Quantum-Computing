@@ -8,9 +8,10 @@ class SchedulingData(metaclass=ABCMeta):
 
 
 class JobShopSchedulingData(SchedulingData):
-    def __init__(self, M, P):
+    def __init__(self, M, P, filename):
         self._M = M
         self._P = P
+        self._filename = filename
 
     @property
     def get_M(self):
@@ -19,3 +20,7 @@ class JobShopSchedulingData(SchedulingData):
     @property
     def get_P(self):
         return self._P
+
+    @property
+    def get_filename(self):
+        return self._filename

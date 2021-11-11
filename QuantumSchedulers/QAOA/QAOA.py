@@ -22,6 +22,10 @@ class Preprocessor(metaclass=ABCMeta):
     def preprocess(self, hamiltonian=None, scheduling_data=None):
         pass
 
+    @abstractmethod
+    def get_name(self):
+        pass
+
 
 class CircuitBuilder(metaclass=ABCMeta):
     def __init__(self):
@@ -46,7 +50,6 @@ class CircuitBuilder(metaclass=ABCMeta):
                 assert num_qubits is not None
             self.build_quantum_circuit(theta, bqm, num_qubits)
 
-
         return self._quantum_circuit
 
     def set_bqm(self, bqm, num_qubits):
@@ -57,14 +60,26 @@ class CircuitBuilder(metaclass=ABCMeta):
     def build_quantum_circuit(self, theta, bqm, num_qubits: int):
         pass
 
+    @abstractmethod
+    def get_name(self):
+        pass
+
 
 class QCSampler(metaclass=ABCMeta):
-    def __init__(self):
+    def __init__(self, seed_simulator=937162211):
         self._backend = None
+        self._seed = seed_simulator
 
     @abstractmethod
     def sample_qc(self, quantum_circuit, num_reads):
         pass
+
+    @abstractmethod
+    def get_name(self):
+        pass
+
+    def get_seed(self):
+        return self._seed
 
 
 class ThetaOptimizer(metaclass=ABCMeta):
@@ -101,6 +116,10 @@ class ThetaOptimizer(metaclass=ABCMeta):
                        theta_init):
         pass
 
+    @abstractmethod
+    def get_name(self):
+        pass
+
 
 class Postprocessor(metaclass=ABCMeta):
     def __init__(self):
@@ -117,6 +136,11 @@ class Postprocessor(metaclass=ABCMeta):
     @abstractmethod
     def postprocess(self, postprocessing_input: dict):
         pass
+
+    @abstractmethod
+    def get_name(self):
+        pass
+
 
 
 

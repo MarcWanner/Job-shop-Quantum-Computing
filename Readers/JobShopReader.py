@@ -18,5 +18,5 @@ class JobShopReader(Reader):
             times[cnt, :] = numbers[1::2]
             cnt += 1
 
-        self._data = JobShopSchedulingData(sequences, times)
+        self._data = JobShopSchedulingData(sequences, times, path)
 

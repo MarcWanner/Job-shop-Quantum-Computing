@@ -19,3 +19,4 @@ class SimpleQUBOSolver(QCJobShopScheduler, metaclass=ABCMeta):
 
 from QuantumSchedulers.QUBOSolvers.SASolver import SASolver
 from QuantumSchedulers.QUBOSolvers.QASolver import QASolver
+from QuantumSchedulers.QUBOSolvers.QiskitQAOASolver import QiskitQAOASolver

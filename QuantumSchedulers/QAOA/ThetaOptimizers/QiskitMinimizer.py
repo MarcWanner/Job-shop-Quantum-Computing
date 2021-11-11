@@ -22,6 +22,9 @@ class QiskitMinimizer(ThetaOptimizer):
         if verbose:
             print(res)
 
+    def get_name(self):
+        return "QISKITMINIMIZER_" + self._method
+
 
 def key_to_vector(key: str):
     return np.array([int(c) for c in key], dtype=np.int)

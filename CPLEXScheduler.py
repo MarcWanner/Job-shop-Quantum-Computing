@@ -9,6 +9,7 @@ class CPLEXSolver(JobShopScheduler):
         super().__init__(data)
         self._solution = None
         self._model = None
+        self._Tmin = None
 
     def solve(self):
         size = self._data.get_M.shape
@@ -44,8 +45,8 @@ class CPLEXSolver(JobShopScheduler):
     def get_plottable_solution(self):
         assert self._solution is not None
         J, m = self._data.get_M.shape
-        T = math.ceil(self._solution.get_objective_value())
-        self._plottable_solution = np.zeros((J, m, T), dtype=np.int)
+        self._Tmin = math.ceil(self._solution.get_objective_value())
+        self._plottable_solution = np.zeros((J, m, self._Tmin), dtype=np.int)
         i = 0
         o = 0
         for var in self._model.iter_integer_vars():
@@ -63,5 +64,9 @@ class CPLEXSolver(JobShopScheduler):
 
     def get_solver_name(self):
         return "CLPEX Solver"
+
+    def get_Tmin(self):
+        assert self._Tmin is not None
+        return self._Tmin
 
 

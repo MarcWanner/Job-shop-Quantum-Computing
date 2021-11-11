@@ -158,6 +158,9 @@ class JobShopHamiltonianConstructor(HamiltonianConstructor):
             pruned[i] = plottable_solution[self.label_to_3d_idx(self._labels[i])]
         return pruned
 
+    def get_name(self):
+        return "JOBSHOP_HAMILTONIAN_CONSTRUCTOR"
+
 
 def get_label(op_idx, t):
     return "X_[" + str(op_idx) + "][" + str(t) + "]"
