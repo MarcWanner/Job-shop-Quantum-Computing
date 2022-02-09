@@ -14,8 +14,8 @@ class QuboCircuitBuilder(CircuitBuilder):
         self._num_qubits = num_qubits
         p = int(len(theta) / 2)
         self._quantum_circuit = QuantumCircuit(num_qubits)
-        gammas = theta[p:]
         betas = theta[:p]
+        gammas = theta[p:]
         u_problem = u_problem_dense
 
         if type(bqm).__name__ is 'BinaryQuadraticModel':
@@ -43,7 +43,7 @@ def qc_init(num_qubits: int):
 def u_mixer(beta: float, num_qubits: int):
     qc = QuantumCircuit(num_qubits)
     for i in range(num_qubits):
-        qc.rx(2*beta, i)
+        qc.rx(-2*beta, i)
     return qc
 
 
@@ -53,8 +53,9 @@ def u_problem_dense(gamma: float, num_qubits: int, hamiltonian):
     for j in range(num_qubits):
         sumq = 0
         for k in range(num_qubits):
-            sumq += hamiltonian[j, k]
-        qaoa_circuit.rz((hamiltonian[j, j] + sumq) * gamma, j)
+            sumq += 0.5 * (hamiltonian[j, k] + hamiltonian[k, j])
+        if sumq != 0:
+            qaoa_circuit.rz(-sumq * gamma, j)
 
     # Apply R_ZZ rotational gates for entangled qubit rotations from cost layer
     for j in range(num_qubits):

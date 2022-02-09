@@ -1,6 +1,7 @@
 from scipy.optimize import minimize
 from QuantumSchedulers.QAOA.QAOA import ThetaOptimizer, QCSampler, CircuitBuilder
 import numpy as np
+import math
 
 
 class QiskitMinimizer(ThetaOptimizer):
@@ -27,21 +28,21 @@ class QiskitMinimizer(ThetaOptimizer):
 
 
 def key_to_vector(key: str):
-    return np.array([int(c) for c in key], dtype=np.int)
+    return np.array([int(c) for c in key], dtype=np.int)[::-1]
 
 
 def expected_value(counts: dict, num_reads: int, hamiltonian):
     F = 0
-    for bitstring, counts in counts.items():
+    for bitstring, count in counts.items():
         x = key_to_vector(bitstring)
-        F += counts*np.dot(np.dot(x, hamiltonian), x)
+        F += count*np.dot(np.dot(x, hamiltonian), x)
     return F/num_reads
 
 
 def get_expectation(hamiltonian, builder, sampler, num_reads):
     def execute_circ(theta):
         qc = builder.get_quantum_circuit(theta)
-        counts = sampler.sample_qc(qc, num_reads)
+        counts = sampler.get_counts(qc, num_reads)
         return expected_value(counts, num_reads, hamiltonian)
 
     return execute_circ

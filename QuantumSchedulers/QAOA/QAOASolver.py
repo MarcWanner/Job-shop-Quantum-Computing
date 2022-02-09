@@ -11,6 +11,8 @@ import dimod
 import numpy as np
 from qiskit.visualization import plot_histogram
 import seaborn as sns
+import threading
+import logging
 from dimod import SampleSet
 
 
@@ -30,25 +32,33 @@ class QAOASolver(QCJobShopScheduler):
         self._postprocessor = postprocessor
         self._p = p
         self._theta = theta
-        if theta is None and preprocessor is None:
+        if theta is None:
             self._theta = default_init_theta(p)
         self._qaoa_data = None
         self._quantum_circuit = None
         self._counts = None
         self._total_counts = None
         self._Tmin = None
+        self._optimal_energy = None
+        self._time: dict = {"HAMILTONIAN_CONSTRUCTOR": "NONE", "PREPROCESSOR": "NONE", "CIRCUIT_BUILDER": "NONE",
+                            "QCSAMPLER": "NONE", "THETAOPTIMIZER": "NONE", "POSTPROCESSOR": "NONE", "REPS": "NONE"}
         self.init_benchmarking()
 
-    def solve(self, num_reads=1000, energy_rank=0, optimal_plottable_solution=None, num_reads_eval=10000):
+    def solve(self, num_reads=1000, energy_rank=0, optimal_plottable_solution=None, num_reads_eval=10000,
+              preprocess_only=False):
+        self.reset_times()
         if self._preprocessor is not None:
-            self.process_qaoa_data(self._preprocessor.preprocess(self._hamiltonian, self._data))
+            self._qaoa_data = self._preprocessor.get_preprocess_data(self._hamiltonian, self._data)
+        if preprocess_only:
+            return
         # adjust circuit builder so that it only depends on theta
         self._circuit_builder.set_bqm(self._hamiltonian, self._num_qubits)
+        self._circuit_builder.set_preprocess_data(self._qaoa_data)
         # run QAOA
         self._theta = self._theta_optimizer.get_theta(self._hamiltonian, self._theta, num_reads, self._circuit_builder,
                                                       self._qc_sampler)
         self._quantum_circuit = self._circuit_builder.get_quantum_circuit(self._theta, self._hamiltonian, self._num_qubits)
-        self._counts = self._qc_sampler.sample_qc(self._quantum_circuit, num_reads_eval)
+        self._counts = self._qc_sampler.get_counts(self._quantum_circuit, num_reads_eval)
         if self._postprocessor is not None:
             postprocessing_input = None  # tbd, postprocessing input is a dummy, replace by arguments like qc, etc when
                                          # known what is needed
@@ -57,9 +67,6 @@ class QAOASolver(QCJobShopScheduler):
         self._total_counts = num_reads
         optimal_plottable_solution = self.extend_optimal_plottable_solution(optimal_plottable_solution)
         self.update_benchmarking(optimal_plottable_solution, num_reads_eval)
-
-    def process_qaoa_data(self, qaoa_data):
-        pass
 
     def get_solver_name(self):
         return "QAOA"
@@ -75,15 +82,35 @@ class QAOASolver(QCJobShopScheduler):
             print((shape[0]-i) * beta_stepsize, j * gamma_stepsize, result[i, j])
         fig, ax = plt.subplots()
         ax = sns.heatmap(result, center=0, xticklabels=['0', r'$\pi$', r'$2\pi$'], yticklabels=[r'$\pi$', '0'])
-        ax.set_title("Energy landscape")
-        ax.set_xlabel(r'$\gamma$')
-        ax.set_ylabel(r'$\beta$')
+        ax.set_title(r'$F_1(\mathbf{\gamma},\mathbf{\beta})$')
+        ax.set_xlabel(r'$\mathbf{\gamma}$')
+        ax.set_ylabel(r'$\mathbf{\beta}$')
         ax.set_xticks([0, shape[1]/2, shape[1]])
         ax.set_yticks([0, shape[0]])
 
-    def get_success_probability(self, theta, optimal_energy, num_reads):
-        qc = self._circuit_builder.get_quantum_circuit(theta, self._hamiltonian, self._num_qubits)
-        counts = self._qc_sampler.sample_qc(qc, num_reads)
+    def compute_expectation_heatmap_parallel(self, shape, num_reads, nthreads, thread_id):
+        self._circuit_builder.set_bqm(self._hamiltonian, self._num_qubits)
+        expectation = get_expectation(self._hamiltonian, self._circuit_builder, self._qc_sampler, num_reads)
+        beta_stepsize = math.pi / shape[0]
+        gamma_stepsize = 2 * math.pi / shape[1]
+        result = np.zeros(shape)
+        rows_per_thread = int(shape[0] / nthreads)
+        istart = thread_id*rows_per_thread
+        iend = (thread_id+1)*rows_per_thread
+        for i in range(istart, iend):
+            for j in range(shape[1]):
+                result[i, j] = expectation([(shape[0] - i) * beta_stepsize, j * gamma_stepsize])
+        filename = "Threading/thread_"+str(thread_id)+".txt"
+        with open(filename, "w") as file:
+            for i in range(istart, iend):
+                for j in range(shape[1]):
+                    file.write(str(i) + " " + str(j) + " " + str(result[i, j])+"\n")
+
+    def get_success_probability(self, theta, optimal_energy, num_reads, run_simulation=True):
+        counts = self._counts
+        if run_simulation:
+            qc = self._circuit_builder.get_quantum_circuit(theta, self._hamiltonian, self._num_qubits)
+            counts = self._qc_sampler.get_counts(qc, num_reads)
         nsolved = 0
         energy_counts = to_energy_counts(counts, self._hamiltonian)
         for energy_count in energy_counts:
@@ -114,7 +141,30 @@ class QAOASolver(QCJobShopScheduler):
         ax.set_xticks([0, shape[1] / 2, shape[1]])
         ax.set_yticks([0, shape[0]])
 
+    def compute_success_probability_heatmap_parallel(self, shape, optimal_plottable_solution, num_reads: int,
+                                                     nthreads, thread_id):
+        optimal_plottable_solution = self.extend_optimal_plottable_solution(optimal_plottable_solution)
+        optimal_energy = self.get_optimal_energy(optimal_plottable_solution)
+        self._circuit_builder.set_bqm(self._hamiltonian, self._num_qubits)
+        beta_stepsize = math.pi / shape[0]
+        gamma_stepsize = 2 * math.pi / shape[1]
+        result = np.zeros(shape)
+        rows_per_thread = int(shape[0] / nthreads)
+        istart = thread_id * rows_per_thread
+        iend = (thread_id + 1) * rows_per_thread
+        for i in range(istart, iend):
+            for j in range(shape[1]):
+                result[i, j] = self.get_success_probability([(shape[0] - i) * beta_stepsize, j * gamma_stepsize],
+                                                            optimal_energy, num_reads)
+        filename = "Threading/thread_" + str(thread_id) + ".txt"
+        with open(filename, "w") as file:
+            for i in range(istart, iend):
+                for j in range(shape[1]):
+                    file.write(str(i) + " " + str(j) + " " + str(result[i, j]) + "\n")
+
     def get_optimal_energy(self, optimal_plottable_solution):
+        if self._optimal_energy is not None:
+            return self._optimal_energy
         optimal_plottable_solution = self.extend_optimal_plottable_solution(optimal_plottable_solution)
         # remove the ones from the plottable solution so that it only starts once
         J, m, T = optimal_plottable_solution.shape
@@ -125,7 +175,9 @@ class QAOASolver(QCJobShopScheduler):
                         np.zeros((self._data.get_P[i, o] - 1))
 
         reduced_solution = self._hamiltonian_constructor.plottable_solution_to_pruned(optimal_plottable_solution)
+        print("Reduced solution: ", reduced_solution)
         optimal_energy = np.dot(np.dot(reduced_solution, self._hamiltonian), reduced_solution)
+        print("Optimal energy: ", optimal_energy)
         return optimal_energy
 
     def extend_optimal_plottable_solution(self, optimal_plottable_solution):
@@ -161,14 +213,19 @@ class QAOASolver(QCJobShopScheduler):
         self._benchmarking_data["NUM_QUBITS"] = self._num_qubits
         self._benchmarking_data["P"] = self._p
         self._benchmarking_data["SEED"] = self._qc_sampler.get_seed()
+        self._benchmarking_data["THETA_INIT"] = self._theta
         #Results
         self._benchmarking_data["THETA"] = self._theta
         self._benchmarking_data["EXPECTED_ENERGY"] = "NONE"
+        self._benchmarking_data["OPTIMAL_ENERGY"] = "NONE"
         self._benchmarking_data["SUCCESS_PROBABILITY"] = "NONE"
         self._benchmarking_data["SOLUTION_ENERGY"] = "NONE"
         self._benchmarking_data["SOLUTION_PROBABILITY"] = "NONE"
+        self._benchmarking_data["QAOA_DATA"] = "NONE"
+        self._benchmarking_data["TIME"] = self._time
 
     def update_benchmarking(self, optimal_plottable_solution, num_reads_eval):
+        self.update_times()
         #Input data
         self._benchmarking_data["NUM_READS"] = self._total_counts
         self._benchmarking_data["NUM_READS_EVAL"] = num_reads_eval
@@ -177,26 +234,58 @@ class QAOASolver(QCJobShopScheduler):
         self._benchmarking_data["EXPECTED_ENERGY"] = self._theta_optimizer.get_expected_energy()
         if optimal_plottable_solution is not None:
             optimal_energy = self.get_optimal_energy(optimal_plottable_solution)
+            self._benchmarking_data["OPTIMAL_ENERGY"] = optimal_energy
             self._benchmarking_data["SUCCESS_PROBABILITY"] = self.get_success_probability(self._theta, optimal_energy,
-                                                                                          num_reads_eval)
+                                                                                          num_reads_eval, run_simulation=False)
             self._benchmarking_data["T_MIN"] = self._Tmin
         self._benchmarking_data["SOLUTION_ENERGY"] = self._sampleset.first.energy
         self._benchmarking_data["SOLUTION_PROBABILITY"] = self._sampleset.first.num_occurrences/num_reads_eval
+        self._benchmarking_data["QAOA_DATA"] = self._qaoa_data
+        self._benchmarking_data["TIME"] = self._time
 
     def draw_quantum_circuit(self):
         if self._quantum_circuit is None:
             self._quantum_circuit = self._circuit_builder.get_quantum_circuit(self._theta, self._hamiltonian, self._num_qubits)
         return self._quantum_circuit.decompose().decompose().draw(output='mpl')
 
+    def set_p(self, p):
+        self._p = p
+        self._benchmarking_data["P"] = self._p
+
+    def reset_theta(self, theta=None):
+        if theta is not None:
+            assert len(theta) == 2*self._p, "Set p to " + str(len(theta)/2) + " first before resetting theta"
+            self._theta = theta
+        else:
+            self._theta = default_init_theta(self._p)
+            self._benchmarking_data["THETA_INIT"] = self._theta
+            self._benchmarking_data["THETA"] = self._theta
+
+    def reset_times(self):
+        self._circuit_builder.reset_time()
+        self._qc_sampler.reset_time()
+
+    def update_times(self):
+        self._time["HAMILTONIAN_CONSTRUCTOR"] = self._hamiltonian_constructor.get_time()
+        if self._preprocessor is not None:
+            self._time["PREPROCESSOR"] = self._preprocessor.get_time()
+        self._time["CIRCUIT_BUILDER"] = self._circuit_builder.get_time()
+        self._time["QCSAMPLER"] = self._qc_sampler.get_time()
+        self._time["THETAOPTIMIZER"] = self._theta_optimizer.get_time()
+        if self._postprocessor is not None:
+            self._time["POSTPROCESSOR"] = self._postprocessor.get_time()
+        self._time["REPS"] = self._qc_sampler.get_nreps() - 1
+
 
 def default_init_theta(p):
-    return [math.pi * (1 + (i % 2)) * random() for i in range(2*p)]
+    return [math.pi * (1 + int(i/p)) * random() for i in range(2*p)]
 
 
 def key_to_dict(key: str):
     res_dict = {}
-    for i in range(len(key)):
-        res_dict[i] = int(key[i])
+    x = key_to_vector(key)
+    for i in range(len(x)):
+        res_dict[i] = int(x[i])
     return res_dict
 
 
