@@ -3,7 +3,7 @@ from HamiltonianConstructor import JobShopHamiltonianConstructor
 from QuantumScheduler import SASolver, QASolver, QAOASolver, QiskitQAOASolver, CPLEXWarmstart, SDPWarmstart, \
     SimpleWarmstart, WarmstartCircuitBuilder, IBMRealDevice, MCMCMinimizer, LazySampler, QiskitQAOAOptimizer, \
     RealDeviceQiskitQAOAOptimizer
-
+from QuantumSchedulers.QAOA.CircuitBuilders.QuboCircuitBuilder import QuboCircuitBuilder
 from Scheduler import CPLEXSolver, ResultPlotter
 import matplotlib.pyplot as plt
 from qiskit import Aer, transpile
@@ -91,19 +91,24 @@ def main():
     reader.read_problem_data(problem)
     data = reader.get_data()
     hamiltonian_constructor = JobShopHamiltonianConstructor()
+    hamiltonian = hamiltonian_constructor.get_hamiltonian(data, 4, variable_pruning=True, objective_bias=1)
+    print(hamiltonian)
+    cb = QuboCircuitBuilder(log_qc=True)
+    cb.get_quantum_circuit([1, 1], hamiltonian, hamiltonian.shape[0])
+    cb.plot_annealing(range(4), 100)
+    plt.show()
+    print(np.dot(np.dot(np.ones(hamiltonian.shape[0]), hamiltonian), np.ones(hamiltonian.shape[0])))
+
     lhc = LazyHamiltonianConstructor(np.array([[-1, 0, 2], [0, -1, 0], [0, 0, -1]]))
 
     preprocessor = SDPWarmstart()
     hamiltonian_constructor = JobShopHamiltonianConstructor()
-    solver = QAOASolver(data, hamiltonian_constructor, 4, 10, variable_pruning=True, objective_bias=0,
-                        theta_optimizer=MCMCMinimizer(beta=4, xi=0.4, epsilon=0.05, eta=0.05, mcmc_steps=1000),
-                        preprocessor=preprocessor, circuit_builder=WarmstartCircuitBuilder())
+    solver = QAOASolver(data, hamiltonian_constructor, 5, 50, circuit_builder=cb, variable_pruning=True, objective_bias=1)
     cplex_solver = CPLEXSolver(solver.get_data())
     cplex_solver.solve()
     optimal_plottable_solution = cplex_solver.get_plottable_solution()
-    solver.solve(optimal_plottable_solution=optimal_plottable_solution)
-    solver.store_solution("SDP_MCMC_results" + os.sep + "Micro_MCMC_QAOA_10_0.txt")
-    return
+    #solver.solve(optimal_plottable_solution=optimal_plottable_solution)
+    #solver.store_solution("SDP_MCMC_results" + os.sep + "Micro_QAOA_50_0.txt")
 
     compare_qaoa_versions("SDP_MCMC_results" + os.sep, [solver], range(5, 11), num_samples_per_setup=1,
                           solver_names=["MCMC_QAOA"],
